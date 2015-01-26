@@ -278,7 +278,7 @@ sub produce_arff  {
     produce_application_attribute();
     produce_services_attributes();
    
-#    produce_clean_data();
+    produce_clean_data();
 
     close $fh;
 }
@@ -287,39 +287,63 @@ sub produce_arff  {
 
 sub produce_clean_data() {
 
-    open (CSVFILE, $infilename) || die( "Unnable open file");
-    $firstLine = <CSVFILE>;
-
-    print $fh "\@DATA\n";
+    open (UNIQP, $uniqpfile) || die( "Unnable open file");
+    open (SRVTOAPP, $denormalizedapps) || die( "Unnable open file");
+    open (SRVTOPROCS, $denormalizedprocesses) || die( "Unnable open file");
     
-    while ($dataLine = <CSVFILE>) {
+    %hashSrvToApps = ();
+    
+
+    while ($dataLine = <SRVTOAPP> ) {
+        chomp $dataLine;
+	
+	@dataElems = split(",", $dataLine);
+	$hashSrvToApps{$dataElems[0]} = $dataElems[1];
+    }
+    close (SRVTOAPP);
+    
+    $countP = 0;
+    %hashPToNum = ();
+    
+    while ($dataLine = <UNIQP>) {
 	chomp $dataLine;
+	$hashPToNum{$dataLine} = $countP;
+	$countP++;
+    }
+
+    @masterBlank = ('?') x $countP;
+    
+
+    close (UNIQP);
+    
+
+    $intCount = 0;
+    
+    while ($dataLine = <SRVTOPROCS> ) {
+	$intCount++;
 	
-	@dataElems = split (',', $dataLine);
-	@apps = split (";", $dataElems[1]);	
-	
-	for (2..$#dataElems) {
-	    if ($dataElems[$_] =~ /1/) {
-		$dataElems[$_] = "present";
-	    }
-	    else {
-		$dataElems[$_] = "not_present";
-	    }
+	if ($intCount == 10) {
+	    last;
 	}
-	for(0..$#apps) {
-	    if ($apps[$_] =~ /NULL/) {
-	    }
-	    else {
-		$apps[$_] =~ s/\s//g;
-		
-		print $fh join(",", $apps[$_], @dataElems[2..$#dataElems]);
-		print $fh "\n";
-	    } 
+	
+	chomp $dataLine;
+	@copyBlank = @masterBlank;
+	@dataElems = split (",", $dataLine);
+	
+	for (1..$#dataElems) {
+	    $copyBlank[$hashPToNum{$dataElems[$_]}] = 'present';
+	}
+	
+	@splitApps = split (";", $hashSrvToApps{$dataElems[0]});
+	
+	for (0..$#splitApps) {
+	    print $fh $splitApps[$_];
+	    print $fh ",";
+	    print $fh join (",", @copyBlank);
+	    print $fh "\n";
 	}
     }
-    
-	
-	close (CSVFILE);
+    close(SRVTOPROCS);
 
 }
 
@@ -342,14 +366,12 @@ sub produce_services_attributes() {
 sub produce_application_attribute() {
     open (CSVFILE, $uniqafile) || die( "Unnable open file");
 
-
     my %hashApps = ();
     
     while ($dataLine = <CSVFILE>) {
 	chomp $dataLine;
 	$hashApps{$dataLine} = "";
     }
-    
     
     print $fh "\@ATTRIBUTE APPLICATION { ";
     
