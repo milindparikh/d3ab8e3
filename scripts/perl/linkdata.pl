@@ -24,9 +24,9 @@ my $arfffile =  "/home/milind/Downloads/arffv1.arff";
 
 #produce_denormalized_server_to_apps();
 
-produce_arff();
+#produce_arff();
 
-
+produce_merged_app_to_processes();
 
 sub produce_denormalized_server_to_apps {
 
@@ -266,7 +266,121 @@ sub produce_uniq_processes {
     
 
 
+sub produce_merged_app_to_processes {
+    open (SRVTOAPP, $denormalizedapps) || die( "Unnable open file");
+    open (SRVTOPROCS, $denormalizedprocesses) || die( "Unnable open file");
 
+    while ($dataLine = <SRVTOAPP> ) {
+        chomp $dataLine;
+	@dataElems = split(",", $dataLine);
+	$hashSrvToApps{$dataElems[0]} = $dataElems[1];
+    }
+
+    while ($dataLine = <SRVTOPROCS> ) {
+        chomp $dataLine;
+	@dataElems = split(",", $dataLine);
+	$hashSrvToProcs{$dataElems[0]} = join (",", @dataElems[1..$#dataElems]);
+    }
+
+    @sortedServers = sort (keys %hashSrvToApps);
+
+    %appstoprocesses = ();
+
+    
+    
+    for (0..$#sortedServers) {
+	if (exists $hashSrvToProcs{$sortedServers[$_]}) {
+	    @appsonserver = split(";", $hashSrvToApps{$sortedServers[$_]});
+	    @procsonserver = split(",", $hashSrvToProcs{$sortedServers[$_]});
+	    
+
+	    for (0..$#appsonserver) {
+		$currentApp = $appsonserver[$_];		
+		if (not (exists $appstoprocesses{$currentApp})) {
+		    $appstoprocesses{$currentApp} = ();
+		}
+		for (0..$#procsonserver) {
+		    $appstoprocesses{$currentApp}{$procsonserver[$_]} = 1;
+		}
+	    }
+	}
+    }
+
+
+    %processesonapps = ();    
+    @sortedApps = sort (keys %appstoprocesses);
+
+    for (0..$#sortedApps) {
+	
+	@sortedProcesses = 
+	    sort (keys $appstoprocesses{$sortedApps[$_]});
+	for (0..$#sortedProcesses) {
+	    
+	    if (not (exists $processesonapps{$sortedProcesses[$_]}) ) {
+		
+		$processesonapps{$sortedProcesses[$_]} = 1;
+	    } 
+	    else {
+		$processesonapps{$sortedProcesses[$_]}++;
+	    }
+	}
+
+    }
+
+
+    @sortedProcessesOnApps = sort (keys %processesonapps);
+
+    %idf = ();
+    
+    for (0..$#sortedProcessesOnApps) {
+	
+	$freqInCorpus = $processesonapps{$sortedProcessesOnApps[$_]};
+	
+	$iidf =  1 + log ($#sortedApps/$freqInCorpus);
+	
+         
+        	
+	$idf{$sortedProcessesOnApps[$_]} = $iidf ;
+    }
+    
+    %ntfidf = ();
+    
+    for (0..$#sortedApps) {	
+	$currentApp = $sortedApps[$_];
+	
+	print " SADD apps ";
+	print $currentApp;
+	print "\n\n";
+
+	@numprocs = (keys $appstoprocesses{$currentApp});
+	
+	@sortedProcesses = 
+	    sort (keys $appstoprocesses{$currentApp});
+	for (0..$#sortedProcesses) {
+	    
+	    $currentProcess = $sortedProcesses[$_];
+	    print " SADD procs:";
+	    print $currentApp;
+	    print "  " ;
+	    print $currentProcess;
+	    print "\n\n";
+	    
+	    
+	    $currentIdf = $idf{$sortedProcesses[$_]};
+	    $ntfidf = (1/$#numprocs) * $currentIdf;
+	    
+	    print "HSET ntfidf:";
+	    print $currentApp;
+	    print "  ";
+	    print $sortedProcesses[$_];
+			       
+	    print "  "; 
+	    
+	    print  $ntfidf;
+	    print "\n\n";
+	}
+    }
+}
 
 
 sub produce_arff  {
@@ -322,7 +436,7 @@ sub produce_clean_data() {
     while ($dataLine = <SRVTOPROCS> ) {
 	$intCount++;
 	
-	if ($intCount == 10) {
+	if ($intCount == 100) {
 	    last;
 	}
 	
