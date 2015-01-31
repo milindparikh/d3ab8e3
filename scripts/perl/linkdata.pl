@@ -338,6 +338,11 @@ sub produce_merged_app_to_processes {
 	
 	$iidf =  1 + log ($#sortedApps/$freqInCorpus);
 	
+	print " HSET idf " ;
+	print $sortedProcessesOnApps[$_];
+	print "  ";
+	print $iidf;
+	print "\n\n";
          
         	
 	$idf{$sortedProcessesOnApps[$_]} = $iidf ;
